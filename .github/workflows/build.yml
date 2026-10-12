@@ -1,0 +1,42 @@
+name: Build Vosk models
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Download and repackage models
+        run: |
+          set -e
+          mkdir -p site
+          pack () {
+            name="$1"; hf="$2"
+            curl -fL --retry 3 -o m.zip "https://alphacephei.com/vosk/models/$name.zip" \
+              || curl -fL --retry 3 -o m.zip "https://huggingface.co/rhasspy/vosk-models/resolve/main/$hf/$name.zip"
+            unzip -q m.zip
+            rm m.zip
+            mv "$name" model
+            tar -czf "site/$name.tar.gz" model
+            rm -rf model
+          }
+          pack vosk-model-small-cn-0.22 zh
+          pack vosk-model-en-us-0.22-lgraph en
+          echo '<p>Vosk models for Qualtrics</p>' > site/index.html
+          ls -lh site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
